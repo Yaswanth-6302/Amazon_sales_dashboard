@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Sales Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #080c14;
+    --bg-secondary: #0d1421;
+    --bg-card: #111827;
+    --bg-card-hover: #162033;
+    --border: #1e2d45;
+    --border-bright: #2a3f5f;
+    --accent-cyan: #00d4ff;
+    --accent-orange: #ff6b35;
+    --accent-green: #00e5a0;
+    --accent-purple: #a855f7;
+    --accent-yellow: #fbbf24;
+    --text-primary: #e8f0fe;
+    --text-secondary: #8899bb;
+    --text-muted: #4a5980;
+    --gradient-1: linear-gradient(135deg, #00d4ff22, #a855f722);
+    --gradient-2: linear-gradient(135deg, #ff6b3522, #fbbf2422);
+    --gradient-3: linear-gradient(135deg, #00e5a022, #00d4ff22);
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --shadow-glow-cyan: 0 0 20px rgba(0,212,255,0.15);
+    --shadow-glow-orange: 0 0 20px rgba(255,107,53,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── UPLOAD SCREEN ── */
+  #upload-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #upload-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 20%, rgba(0,212,255,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(168,85,247,0.08) 0%, transparent 60%);
+  }
+
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .upload-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 24px;
+    padding: 60px 64px;
+    max-width: 560px;
+    width: 90%;
+    text-align: center;
+    box-shadow: var(--shadow), var(--shadow-glow-cyan);
+  }
+
+  .upload-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .logo-text { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; letter-spacing: 2px; text-transform: uppercase; display: block; }
+
+  .upload-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 10px; }
+  .upload-subtitle { color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin-bottom: 40px; }
+
+  .drop-zone {
+    border: 2px dashed var(--border-bright);
+    border-radius: 16px;
+    padding: 48px 32px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: rgba(0,212,255,0.02);
+    margin-bottom: 20px;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent-cyan);
+    background: rgba(0,212,255,0.06);
+    box-shadow: var(--shadow-glow-cyan);
+  }
+
+  .drop-icon { font-size: 48px; margin-bottom: 16px; display: block; }
+  .drop-text { font-size: 15px; color: var(--text-secondary); }
+  .drop-text strong { color: var(--accent-cyan); }
+
+  #file-input { display: none; }
+
+  .upload-btn {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 36px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    letter-spacing: 0.2px;
+  }
+
+  .upload-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+  .format-hint {
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── DASHBOARD ── */
+  #dashboard { display: none; }
+
+  /* Top Bar */
+  .topbar {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .topbar-logo { display: flex; align-items: center; gap: 10px; }
+  .topbar-logo .logo-badge {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .topbar-logo span { font-size: 15px; font-weight: 600; }
+  .topbar-logo small { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; letter-spacing: 1.5px; text-transform: uppercase; display: block; }
+
+  .topbar-divider { width: 1px; height: 24px; background: var(--border); }
+
+  #summary-bar {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+  }
+
+  #summary-bar span { color: var(--accent-cyan); font-weight: 500; }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-reset:hover { border-color: var(--accent-orange); color: var(--accent-orange); }
+
+  .btn-upload-new {
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent-cyan);
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .btn-upload-new:hover { background: rgba(0,212,255,0.18); }
+
+  /* Filter Bar */
+  .filter-bar {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-label { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  .filter-select, .filter-input {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    min-width: 130px;
+    max-width: 180px;
+  }
+
+  .filter-select:focus, .filter-input:focus { border-color: var(--accent-cyan); }
+
+  .date-range { display: flex; align-items: center; gap: 6px; }
+  .date-range span { font-size: 11px; color: var(--text-muted); }
+
+  .range-display {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    min-width: 90px;
+    text-align: center;
+  }
+
+  .filter-input[type="range"] {
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border-bright);
+    border: none;
+    border-radius: 2px;
+    padding: 0;
+    width: 120px;
+    min-width: unset;
+    cursor: pointer;
+  }
+
+  .filter-input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent-cyan);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* Main Content */
+  .main-content { padding: 24px 28px; }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .kpi-card:nth-child(1)::before { background: linear-gradient(90deg, var(--accent-cyan), transparent); }
+  .kpi-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent-orange), transparent); }
+  .kpi-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent-green), transparent); }
+  .kpi-card:nth-child(4)::before { background: linear-gradient(90deg, var(--accent-purple), transparent); }
+
+  .kpi-card:hover { border-color: var(--border-bright); }
+
+  .kpi-label { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+  .kpi-card:nth-child(1) .kpi-value { color: var(--accent-cyan); }
+  .kpi-card:nth-child(2) .kpi-value { color: var(--accent-orange); }
+  .kpi-card:nth-child(3) .kpi-value { color: var(--accent-green); }
+  .kpi-card:nth-child(4) .kpi-value { color: var(--accent-purple); }
+
+  .kpi-sub { font-size: 12px; color: var(--text-muted); }
+  .kpi-icon { position: absolute; right: 20px; top: 20px; font-size: 22px; opacity: 0.25; }
+
+  /* Chart Grid */
+  .charts-row {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .charts-row-1 { grid-template-columns: 2fr 1fr; }
+  .charts-row-2 { grid-template-columns: 1fr 1fr 1fr; }
+  .charts-row-3 { grid-template-columns: 1fr 1fr; }
+
+  .chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    transition: border-color 0.2s;
+  }
+
+  .chart-card:hover { border-color: var(--border-bright); }
+
+  .chart-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .chart-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .chart-badge {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    background: rgba(0,212,255,0.1); color: var(--accent-cyan);
+    padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(0,212,255,0.2);
+  }
+
+  .chart-canvas-wrap { position: relative; }
+
+  /* Active filter indicator */
+  .active-filter-dot {
+    width: 6px; height: 6px;
+    background: var(--accent-orange);
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 6px;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Data Table */
+  .table-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-top: 16px;
+    margin-bottom: 24px;
+  }
+
+  .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .table-controls { display: flex; align-items: center; gap: 10px; }
+  .table-search {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    width: 200px;
+  }
+  .table-search:focus { border-color: var(--accent-cyan); }
+
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.2s;
+  }
+  .data-table th:hover { color: var(--accent-cyan); }
+  .data-table th.sorted-asc::after { content: ' ↑'; color: var(--accent-cyan); }
+  .data-table th.sorted-desc::after { content: ' ↓'; color: var(--accent-cyan); }
+
+  .data-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .data-table tr:hover td { background: rgba(0,212,255,0.03); color: var(--text-primary); }
+
+  .td-revenue { color: var(--accent-green) !important; font-family: 'DM Mono', monospace; font-weight: 500; }
+  .td-category { color: var(--accent-cyan) !important; }
+  .td-id { color: var(--text-muted) !important; font-family: 'DM Mono', monospace; font-size: 11px; }
+
+  .pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .pagination-info { font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+  .pagination-btns { display: flex; gap: 6px; }
+  .page-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .page-btn.active { background: rgba(0,212,255,0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Multi-select dropdown */
+  .multi-select-wrap { position: relative; }
+  .multi-select-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    min-width: 140px;
+    text-align: left;
+    transition: border-color 0.2s;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .multi-select-btn:hover, .multi-select-btn.open { border-color: var(--accent-cyan); color: var(--text-primary); }
+  .multi-select-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+  .multi-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    min-width: 180px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 200;
+    box-shadow: var(--shadow);
+    display: none;
+    padding: 6px;
+  }
+  .multi-select-dropdown.open { display: block; }
+
+  .ms-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .ms-option:hover { background: rgba(0,212,255,0.08); color: var(--text-primary); }
+  .ms-option input[type="checkbox"] { accent-color: var(--accent-cyan); width: 13px; height: 13px; cursor: pointer; }
+  .ms-option.checked { color: var(--accent-cyan); }
+
+  .ms-all {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(8,12,20,0.9);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+    display: none;
+  }
+  .loading-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row-1 { grid-template-columns: 1fr; }
+    .charts-row-2 { grid-template-columns: 1fr 1fr; }
+    .charts-row-3 { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .charts-row-2 { grid-template-columns: 1fr; }
+    .filter-bar { overflow-x: auto; flex-wrap: nowrap; }
+    .main-content { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Upload Screen -->
+<div id="upload-screen">
+  <div class="grid-bg"></div>
+  <div class="upload-card">
+    <div class="upload-logo">
+      <div class="logo-icon">📊</div>
+      <div>
+        <span class="logo-text">SalesIntel</span>
+        <small class="logo-sub">Amazon Analytics</small>
+      </div>
+    </div>
+    <h1 class="upload-title">Drop your sales data<br>and watch it come alive</h1>
+    <p class="upload-subtitle">Upload your Amazon CSV export to instantly generate an interactive analytics dashboard with real-time filters, charts, and insights.</p>
+    <div class="drop-zone" id="drop-zone">
+      <span class="drop-icon">📁</span>
+      <p class="drop-text">Drag & drop your CSV file here<br>or <strong>click to browse</strong></p>
+    </div>
+    <input type="file" id="file-input" accept=".csv,.xlsx">
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">Choose CSV File</button>
+    <p class="format-hint">Supports: order_id · order_date · product_category · total_revenue · and more</p>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">
+        <div class="logo-badge">📊</div>
+        <div>
+          <span>SalesIntel</span>
+          <small>AMAZON ANALYTICS</small>
+        </div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div id="summary-bar">Loading...</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-reset" onclick="resetAllFilters()">✕ Reset Filters</button>
+      <button class="btn-upload-new" onclick="uploadNew()">↑ New File</button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label class="filter-label">Date Range</label>
+      <div class="date-range">
+        <input type="date" id="filter-date-from" class="filter-input" style="width:140px;min-width:unset">
+        <span>–</span>
+        <input type="date" id="filter-date-to" class="filter-input" style="width:140px;min-width:unset">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Category</label>
+      <div class="multi-select-wrap" id="ms-category-wrap">
+        <button class="multi-select-btn" id="ms-category-btn" onclick="toggleDropdown('category')">
+          <span id="ms-category-label">All Categories</span>
+          <span>▾</span>
+        </button>
+        <div class="multi-select-dropdown" id="ms-category-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Region</label>
+      <div class="multi-select-wrap" id="ms-region-wrap">
+        <button class="multi-select-btn" id="ms-region-btn" onclick="toggleDropdown('region')">
+          <span id="ms-region-label">All Regions</span>
+          <span>▾</span>
+        </button>
+        <div class="multi-select-dropdown" id="ms-region-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Payment</label>
+      <div class="multi-select-wrap" id="ms-payment-wrap">
+        <button class="multi-select-btn" id="ms-payment-btn" onclick="toggleDropdown('payment')">
+          <span id="ms-payment-label">All Methods</span>
+          <span>▾</span>
+        </button>
+        <div class="multi-select-dropdown" id="ms-payment-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Max Discount: <span id="discount-val">100</span>%</label>
+      <input type="range" id="filter-discount" class="filter-input" min="0" max="100" value="100" step="1">
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Min Rating: <span id="rating-val">0</span>★</label>
+      <input type="range" id="filter-rating" class="filter-input" min="0" max="5" value="0" step="0.5">
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="kpi-revenue">$0</div>
+        <div class="kpi-sub">Sum of all transactions</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value" id="kpi-orders">0</div>
+        <div class="kpi-sub">Unique order IDs</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🧾</div>
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value" id="kpi-aov">$0</div>
+        <div class="kpi-sub">Revenue ÷ Orders</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-label">Top Category</div>
+        <div class="kpi-value" style="font-size:16px;padding-top:4px" id="kpi-top-cat">—</div>
+        <div class="kpi-sub" id="kpi-top-cat-rev">by revenue</div>
+      </div>
+    </div>
+
+    <!-- Charts Row 1: Revenue Over Time + Pie -->
+    <div class="charts-row charts-row-1">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Revenue Over Time</div>
+            <div class="chart-subtitle">Monthly revenue trend</div>
+          </div>
+          <span class="chart-badge">LINE</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:240px">
+          <canvas id="chart-revenue-time"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Payment Methods</div>
+            <div class="chart-subtitle">Click slice to filter</div>
+          </div>
+          <span class="chart-badge">PIE</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:240px">
+          <canvas id="chart-payment"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row 2: Category + Region + Discount -->
+    <div class="charts-row charts-row-2">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Category Performance</div>
+            <div class="chart-subtitle">Click bar to filter</div>
+          </div>
+          <span class="chart-badge">BAR</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:260px">
+          <canvas id="chart-category"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Regional Sales</div>
+            <div class="chart-subtitle">Click bar to filter</div>
+          </div>
+          <span class="chart-badge">BAR</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:260px">
+          <canvas id="chart-region"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Discount vs Revenue</div>
+            <div class="chart-subtitle">Impact analysis</div>
+          </div>
+          <span class="chart-badge">BAR</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:260px">
+          <canvas id="chart-discount"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row 3: Ratings vs Revenue -->
+    <div class="charts-row charts-row-3">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Rating vs Revenue</div>
+            <div class="chart-subtitle">Avg revenue per rating group</div>
+          </div>
+          <span class="chart-badge">BAR</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:200px">
+          <canvas id="chart-rating"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Quantity Sold by Category</div>
+            <div class="chart-subtitle">Units distribution</div>
+          </div>
+          <span class="chart-badge">BAR</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:200px">
+          <canvas id="chart-quantity"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div>
+          <div class="chart-title">Transaction Log</div>
+          <div class="chart-subtitle" id="table-count">25 rows per page</div>
+        </div>
+        <div class="table-controls">
+          <input type="text" id="table-search" class="table-search" placeholder="Search orders..." oninput="tableSearchChange()">
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="data-table">
+          <thead>
+            <tr>
+              <th onclick="sortTable('order_id')">Order ID</th>
+              <th onclick="sortTable('order_date')">Date</th>
+              <th onclick="sortTable('product_category')">Category</th>
+              <th onclick="sortTable('customer_region')">Region</th>
+              <th onclick="sortTable('payment_method')">Payment</th>
+              <th onclick="sortTable('price')">Price</th>
+              <th onclick="sortTable('discount_percent')">Discount</th>
+              <th onclick="sortTable('quantity_sold')">Qty</th>
+              <th onclick="sortTable('rating')">Rating</th>
+              <th onclick="sortTable('total_revenue')">Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span class="pagination-info" id="pagination-info"></span>
+        <div class="pagination-btns" id="pagination-btns"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────
+let rawData = [];
+let filteredData = [];
+let charts = {};
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let sortCol = 'order_date';
+let sortDir = 'desc';
+let tableSearch = '';
+
+// Multi-select state
+const msState = {
+  category: { all: [], selected: new Set() },
+  region:   { all: [], selected: new Set() },
+  payment:  { all: [], selected: new Set() }
+};
+
+// Click-chart filter state
+let chartFilters = { category: null, region: null, payment: null };
+
+// ─── UPLOAD HANDLING ────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) processFile(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+function processFile(file) {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: true,
+    complete: results => {
+      rawData = results.data.map(normalizeRow).filter(r => r.order_date);
+      initDashboard();
+      document.getElementById('upload-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('loading-overlay').style.display = 'none';
+    },
+    error: () => {
+      document.getElementById('loading-overlay').style.display = 'none';
+      alert('Error parsing file. Please check the CSV format.');
+    }
+  });
+}
+
+function normalizeRow(r) {
+  const d = {};
+  for (const k in r) { d[k.trim().toLowerCase().replace(/ /g,'_')] = r[k]; }
+  // Parse date
+  let dateStr = d.order_date;
+  if (dateStr) {
+    const dt = new Date(dateStr);
+    if (!isNaN(dt)) { d._date = dt; d.order_date = dt.toISOString().slice(0,10); }
+    else { d._date = null; }
+  }
+  d.total_revenue = parseFloat(d.total_revenue) || 0;
+  d.price = parseFloat(d.price) || 0;
+  d.discount_percent = parseFloat(d.discount_percent) || 0;
+  d.quantity_sold = parseInt(d.quantity_sold) || 0;
+  d.rating = parseFloat(d.rating) || 0;
+  return d;
+}
+
+function uploadNew() {
+  rawData = []; filteredData = [];
+  Object.values(charts).forEach(c => c && c.destroy());
+  charts = {};
+  document.getElementById('upload-screen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  fileInput.value = '';
+}
+
+// ─── INIT ────────────────────────────────────────────
+function initDashboard() {
+  // Date bounds
+  const dates = rawData.map(r => r.order_date).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('filter-date-from').value = dates[0];
+    document.getElementById('filter-date-to').value = dates[dates.length-1];
+    document.getElementById('filter-date-from').min = dates[0];
+    document.getElementById('filter-date-from').max = dates[dates.length-1];
+    document.getElementById('filter-date-to').min = dates[0];
+    document.getElementById('filter-date-to').max = dates[dates.length-1];
+  }
+
+  // Multi-selects
+  ['category','region','payment'].forEach(key => {
+    const col = key === 'category' ? 'product_category' : key === 'region' ? 'customer_region' : 'payment_method';
+    const vals = [...new Set(rawData.map(r => r[col]).filter(Boolean))].sort();
+    msState[key].all = vals;
+    msState[key].selected = new Set(vals);
+    buildMultiSelect(key, vals);
+  });
+
+  // Range listeners
+  document.getElementById('filter-date-from').addEventListener('change', applyFilters);
+  document.getElementById('filter-date-to').addEventListener('change', applyFilters);
+  document.getElementById('filter-discount').addEventListener('input', e => {
+    document.getElementById('discount-val').textContent = e.target.value;
+    applyFilters();
+  });
+  document.getElementById('filter-rating').addEventListener('input', e => {
+    document.getElementById('rating-val').textContent = e.target.value;
+    applyFilters();
+  });
+
+  applyFilters();
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.multi-select-wrap')) closeAllDropdowns();
+  });
+}
+
+// ─── MULTI-SELECT ─────────────────────────────────────
+function buildMultiSelect(key, vals) {
+  const dd = document.getElementById(`ms-${key}-dropdown`);
+  dd.innerHTML = '';
+  // "Select All"
+  const allDiv = document.createElement('div');
+  allDiv.className = 'ms-option ms-all';
+  allDiv.innerHTML = `<input type="checkbox" id="ms-all-${key}" checked> <label for="ms-all-${key}" style="cursor:pointer">Select All</label>`;
+  allDiv.querySelector('input').addEventListener('change', e => {
+    if (e.target.checked) { msState[key].selected = new Set(vals); }
+    else { msState[key].selected = new Set(); }
+    updateMultiSelectUI(key);
+    applyFilters();
+  });
+  dd.appendChild(allDiv);
+  vals.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'ms-option checked';
+    const id = `ms-${key}-${v.replace(/\W/g,'_')}`;
+    div.innerHTML = `<input type="checkbox" id="${id}" value="${v}" checked> <label for="${id}" style="cursor:pointer">${v}</label>`;
+    div.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) msState[key].selected.add(v);
+      else msState[key].selected.delete(v);
+      updateMultiSelectUI(key);
+      applyFilters();
+    });
+    dd.appendChild(div);
+  });
+}
+
+function updateMultiSelectUI(key) {
+  const sel = msState[key].selected;
+  const all = msState[key].all;
+  const label = document.getElementById(`ms-${key}-label`);
+  const allCheck = document.querySelector(`#ms-all-${key}`);
+  if (sel.size === 0) { label.textContent = 'None'; }
+  else if (sel.size === all.length) { label.textContent = key === 'category' ? 'All Categories' : key === 'region' ? 'All Regions' : 'All Methods'; }
+  else { label.textContent = `${sel.size} selected`; }
+  if (allCheck) allCheck.checked = sel.size === all.length;
+  // Update individual checkboxes
+  const dd = document.getElementById(`ms-${key}-dropdown`);
+  dd.querySelectorAll('input[value]').forEach(inp => {
+    inp.checked = sel.has(inp.value);
+    inp.closest('.ms-option').classList.toggle('checked', inp.checked);
+  });
+}
+
+function toggleDropdown(key) {
+  const dd = document.getElementById(`ms-${key}-dropdown`);
+  const btn = document.getElementById(`ms-${key}-btn`);
+  const isOpen = dd.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) { dd.classList.add('open'); btn.classList.add('open'); }
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.multi-select-btn').forEach(b => b.classList.remove('open'));
+}
+
+// ─── FILTER LOGIC ────────────────────────────────────
+function applyFilters() {
+  const dateFrom = document.getElementById('filter-date-from').value;
+  const dateTo = document.getElementById('filter-date-to').value;
+  const maxDiscount = parseFloat(document.getElementById('filter-discount').value);
+  const minRating = parseFloat(document.getElementById('filter-rating').value);
+
+  filteredData = rawData.filter(r => {
+    if (dateFrom && r.order_date < dateFrom) return false;
+    if (dateTo && r.order_date > dateTo) return false;
+    if (!msState.category.selected.has(r.product_category)) return false;
+    if (!msState.region.selected.has(r.customer_region)) return false;
+    if (!msState.payment.selected.has(r.payment_method)) return false;
+    if (r.discount_percent > maxDiscount) return false;
+    if (r.rating < minRating) return false;
+    if (chartFilters.category && r.product_category !== chartFilters.category) return false;
+    if (chartFilters.region && r.customer_region !== chartFilters.region) return false;
+    if (chartFilters.payment && r.payment_method !== chartFilters.payment) return false;
+    return true;
+  });
+
+  updateKPIs();
+  updateCharts();
+  renderTable();
+  updateSummaryBar();
+}
+
+// ─── KPIs ─────────────────────────────────────────────
+function fmt(n) {
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(2);
+}
+
+function updateKPIs() {
+  const totalRev = filteredData.reduce((s,r) => s + r.total_revenue, 0);
+  const totalOrders = filteredData.length;
+  const aov = totalOrders ? totalRev / totalOrders : 0;
+
+  // Top category
+  const catRev = {};
+  filteredData.forEach(r => { catRev[r.product_category] = (catRev[r.product_category]||0) + r.total_revenue; });
+  let topCat = '—', topRev = 0;
+  for (const [c,v] of Object.entries(catRev)) { if (v > topRev) { topRev = v; topCat = c; } }
+
+  document.getElementById('kpi-revenue').textContent = fmt(totalRev);
+  document.getElementById('kpi-orders').textContent = totalOrders.toLocaleString();
+  document.getElementById('kpi-aov').textContent = fmt(aov);
+  document.getElementById('kpi-top-cat').textContent = topCat;
+  document.getElementById('kpi-top-cat-rev').textContent = fmt(topRev) + ' revenue';
+}
+
+function updateSummaryBar() {
+  const totalRev = filteredData.reduce((s,r) => s + r.total_revenue, 0);
+  const activeFilters = Object.values(chartFilters).filter(Boolean).length;
+  document.getElementById('summary-bar').innerHTML =
+    `Showing <span>${filteredData.length.toLocaleString()}</span> of <span>${rawData.length.toLocaleString()}</span> orders &nbsp;|&nbsp; Revenue: <span>${fmt(totalRev)}</span>` +
+    (activeFilters ? ` &nbsp;|&nbsp; <span style="color:var(--accent-orange)">${activeFilters} chart filter${activeFilters>1?'s':''} active</span>` : '');
+}
+
+// ─── CHARTS ───────────────────────────────────────────
+const PALETTE = ['#00d4ff','#a855f7','#ff6b35','#00e5a0','#fbbf24','#f472b6','#38bdf8','#fb7185','#34d399','#e879f9'];
+
+const baseChartOptions = (opts = {}) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: opts.legend !== undefined ? opts.legend : false, labels: { color: '#8899bb', font: { family: 'Space Grotesk', size: 12 }, padding: 16, usePointStyle: true, pointStyleWidth: 10 } },
+    tooltip: {
+      backgroundColor: '#0d1421',
+      borderColor: '#2a3f5f',
+      borderWidth: 1,
+      titleColor: '#e8f0fe',
+      bodyColor: '#8899bb',
+      padding: 12,
+      cornerRadius: 8,
+      titleFont: { family: 'Space Grotesk', size: 12, weight: '600' },
+      bodyFont: { family: 'DM Mono', size: 11 }
+    }
+  },
+  scales: opts.scales || {}
+});
+
+function makeScales(x = true, y = true) {
+  const sc = {};
+  if (x) sc.x = { grid: { color: 'rgba(30,45,69,0.6)', drawTicks: false }, ticks: { color: '#4a5980', font: { family: 'DM Mono', size: 10 }, maxRotation: 40 }, border: { display: false } };
+  if (y) sc.y = { grid: { color: 'rgba(30,45,69,0.6)', drawTicks: false }, ticks: { color: '#4a5980', font: { family: 'DM Mono', size: 10 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v }, border: { display: false } };
+  return sc;
+}
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); charts[id] = null; } }
+
+function updateCharts() {
+  updateRevenueTimeChart();
+  updateCategoryChart();
+  updatePaymentChart();
+  updateRegionChart();
+  updateDiscountChart();
+  updateRatingChart();
+  updateQuantityChart();
+}
+
+function updateRevenueTimeChart() {
+  // Group by YEAR-MONTH
+  const monthly = {};
+  filteredData.forEach(r => {
+    const mo = r.month || r.MONTH; const yr = r.year || r.YEAR;
+    if (!mo || !yr) return;
+    const key = `${yr}-${String(mo).padStart(2,'0')}`;
+    monthly[key] = (monthly[key]||0) + r.total_revenue;
+  });
+  const keys = Object.keys(monthly).sort();
+  const vals = keys.map(k => monthly[k]);
+
+  const labels = keys.map(k => {
+    const [y,m] = k.split('-');
+    return new Date(y, parseInt(m)-1).toLocaleString('default', {month:'short', year:'2-digit'});
+  });
+
+  destroyChart('revenue-time');
+  const ctx = document.getElementById('chart-revenue-time').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 220);
+  grad.addColorStop(0, 'rgba(0,212,255,0.3)');
+  grad.addColorStop(1, 'rgba(0,212,255,0)');
+
+  charts['revenue-time'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Revenue',
+        data: vals,
+        borderColor: '#00d4ff',
+        backgroundColor: grad,
+        pointBackgroundColor: '#00d4ff',
+        pointRadius: keys.length > 36 ? 0 : 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2
+      }]
+    },
+    options: { ...baseChartOptions({ scales: makeScales() }) }
+  });
+}
+
+function updateCategoryChart() {
+  const catRev = {};
+  filteredData.forEach(r => { catRev[r.product_category] = (catRev[r.product_category]||0) + r.total_revenue; });
+  const sorted = Object.entries(catRev).sort((a,b) => b[1]-a[1]);
+  const labels = sorted.map(e => e[0]);
+  const vals = sorted.map(e => e[1]);
+
+  destroyChart('category');
+  const ctx = document.getElementById('chart-category').getContext('2d');
+  charts['category'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Revenue', data: vals, backgroundColor: labels.map((l,i) => chartFilters.category === l ? '#ff6b35' : PALETTE[i % PALETTE.length] + 'cc'), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      ...baseChartOptions({ scales: makeScales() }),
+      indexAxis: 'y',
+      onClick: (e, els) => {
+        if (els.length) {
+          const lbl = labels[els[0].index];
+          chartFilters.category = chartFilters.category === lbl ? null : lbl;
+          applyFilters();
+        }
+      }
+    }
+  });
+}
+
+function updatePaymentChart() {
+  const payRev = {};
+  filteredData.forEach(r => { payRev[r.payment_method] = (payRev[r.payment_method]||0) + r.total_revenue; });
+  const labels = Object.keys(payRev);
+  const vals = labels.map(l => payRev[l]);
+
+  destroyChart('payment');
+  const ctx = document.getElementById('chart-payment').getContext('2d');
+  charts['payment'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: PALETTE.slice(0,labels.length).map(c => c + 'cc'),
+        borderColor: '#111827',
+        borderWidth: 3,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      ...baseChartOptions({ legend: true }),
+      cutout: '60%',
+      onClick: (e, els) => {
+        if (els.length) {
+          const lbl = labels[els[0].index];
+          chartFilters.payment = chartFilters.payment === lbl ? null : lbl;
+          applyFilters();
+        }
+      }
+    }
+  });
+}
+
+function updateRegionChart() {
+  const regRev = {};
+  filteredData.forEach(r => { regRev[r.customer_region] = (regRev[r.customer_region]||0) + r.total_revenue; });
+  const sorted = Object.entries(regRev).sort((a,b) => b[1]-a[1]);
+  const labels = sorted.map(e => e[0]);
+  const vals = sorted.map(e => e[1]);
+
+  destroyChart('region');
+  const ctx = document.getElementById('chart-region').getContext('2d');
+  charts['region'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Revenue', data: vals, backgroundColor: labels.map((l,i) => chartFilters.region === l ? '#ff6b35' : '#a855f7cc'), borderRadius: 6 }]
+    },
+    options: {
+      ...baseChartOptions({ scales: makeScales() }),
+      onClick: (e, els) => {
+        if (els.length) {
+          const lbl = labels[els[0].index];
+          chartFilters.region = chartFilters.region === lbl ? null : lbl;
+          applyFilters();
+        }
+      }
+    }
+  });
+}
+
+function updateDiscountChart() {
+  // Bucket by discount ranges
+  const buckets = {'0%': 0, '1-10%': 0, '11-20%': 0, '21-30%': 0, '31-50%': 0, '51%+': 0};
+  filteredData.forEach(r => {
+    const d = r.discount_percent;
+    if (d === 0) buckets['0%'] += r.total_revenue;
+    else if (d <= 10) buckets['1-10%'] += r.total_revenue;
+    else if (d <= 20) buckets['11-20%'] += r.total_revenue;
+    else if (d <= 30) buckets['21-30%'] += r.total_revenue;
+    else if (d <= 50) buckets['31-50%'] += r.total_revenue;
+    else buckets['51%+'] += r.total_revenue;
+  });
+  const labels = Object.keys(buckets);
+  const vals = labels.map(l => buckets[l]);
+
+  destroyChart('discount');
+  const ctx = document.getElementById('chart-discount').getContext('2d');
+  charts['discount'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Revenue', data: vals, backgroundColor: '#fbbf24cc', borderRadius: 6 }]
+    },
+    options: { ...baseChartOptions({ scales: makeScales() }) }
+  });
+}
+
+function updateRatingChart() {
+  const ratingRev = {};
+  filteredData.forEach(r => {
+    const bucket = r.rating >= 1 ? Math.floor(r.rating) + '★' : 'N/A';
+    if (!ratingRev[bucket]) ratingRev[bucket] = { sum: 0, count: 0 };
+    ratingRev[bucket].sum += r.total_revenue;
+    ratingRev[bucket].count++;
+  });
+  const labels = Object.keys(ratingRev).sort();
+  const vals = labels.map(l => ratingRev[l].count ? ratingRev[l].sum / ratingRev[l].count : 0);
+
+  destroyChart('rating');
+  const ctx = document.getElementById('chart-rating').getContext('2d');
+  charts['rating'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Avg Revenue', data: vals, backgroundColor: '#00e5a0cc', borderRadius: 6 }]
+    },
+    options: { ...baseChartOptions({ scales: makeScales() }) }
+  });
+}
+
+function updateQuantityChart() {
+  const catQty = {};
+  filteredData.forEach(r => { catQty[r.product_category] = (catQty[r.product_category]||0) + r.quantity_sold; });
+  const sorted = Object.entries(catQty).sort((a,b) => b[1]-a[1]);
+  const labels = sorted.map(e => e[0]);
+  const vals = sorted.map(e => e[1]);
+
+  destroyChart('quantity');
+  const ctx = document.getElementById('chart-quantity').getContext('2d');
+  charts['quantity'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Qty Sold', data: vals, backgroundColor: '#f472b6cc', borderRadius: 6 }]
+    },
+    options: { ...baseChartOptions({ scales: { ...makeScales(), y: { ...makeScales().y, ticks: { ...makeScales().y.ticks, callback: v => v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v } } } }) }
+  });
+}
+
+// ─── TABLE ────────────────────────────────────────────
+function tableSearchChange() {
+  tableSearch = document.getElementById('table-search').value.toLowerCase();
+  currentPage = 1;
+  renderTable();
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = 'asc'; }
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable() {
+  let data = [...filteredData];
+
+  // Search
+  if (tableSearch) {
+    data = data.filter(r =>
+      String(r.order_id).toLowerCase().includes(tableSearch) ||
+      String(r.order_date).includes(tableSearch) ||
+      String(r.product_category).toLowerCase().includes(tableSearch) ||
+      String(r.customer_region).toLowerCase().includes(tableSearch) ||
+      String(r.payment_method).toLowerCase().includes(tableSearch)
+    );
+  }
+
+  // Sort
+  data.sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Update header sort indicators
+  document.querySelectorAll('.data-table th').forEach(th => {
+    th.classList.remove('sorted-asc','sorted-desc');
+    if (th.textContent.replace(/[↑↓ ]/g,'').toLowerCase().replace(/ /g,'_') === sortCol ||
+        th.onclick?.toString().includes(`'${sortCol}'`)) {
+      th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    }
+  });
+
+  const total = data.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage-1) * PAGE_SIZE;
+  const pageData = data.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = pageData.map(r => `
+    <tr>
+      <td class="td-id">${r.order_id || '—'}</td>
+      <td>${r.order_date || '—'}</td>
+      <td class="td-category">${r.product_category || '—'}</td>
+      <td>${r.customer_region || '—'}</td>
+      <td>${r.payment_method || '—'}</td>
+      <td>$${(r.price||0).toFixed(2)}</td>
+      <td>${r.discount_percent || 0}%</td>
+      <td>${r.quantity_sold || 0}</td>
+      <td>${r.rating ? r.rating.toFixed(1) + '★' : '—'}</td>
+      <td class="td-revenue">$${(r.total_revenue||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('pagination-info').textContent = `${start+1}–${Math.min(start+PAGE_SIZE, total)} of ${total.toLocaleString()}`;
+  document.getElementById('table-count').textContent = `${total.toLocaleString()} matching rows · 25 per page`;
+
+  // Pagination buttons
+  const btnsEl = document.getElementById('pagination-btns');
+  btnsEl.innerHTML = '';
+  const addBtn = (label, page, disabled, active) => {
+    const btn = document.createElement('button');
+    btn.className = 'page-btn' + (active ? ' active' : '');
+    btn.textContent = label;
+    btn.disabled = disabled;
+    btn.onclick = () => { currentPage = page; renderTable(); };
+    btnsEl.appendChild(btn);
+  };
+  addBtn('‹', currentPage-1, currentPage <= 1);
+  const range = pagRange(currentPage, totalPages);
+  let prev = null;
+  range.forEach(p => {
+    if (prev !== null && p - prev > 1) addBtn('…', null, true);
+    addBtn(p, p, false, p === currentPage);
+    prev = p;
+  });
+  addBtn('›', currentPage+1, currentPage >= totalPages);
+}
+
+function pagRange(current, total) {
+  if (total <= 7) return Array.from({length: total}, (_,i) => i+1);
+  const pages = new Set([1, total, current]);
+  for (let i = Math.max(1,current-1); i <= Math.min(total,current+1); i++) pages.add(i);
+  return [...pages].sort((a,b) => a-b);
+}
+
+// ─── RESET ───────────────────────────────────────────
+function resetAllFilters() {
+  chartFilters = { category: null, region: null, payment: null };
+  ['category','region','payment'].forEach(key => {
+    msState[key].selected = new Set(msState[key].all);
+    updateMultiSelectUI(key);
+  });
+  document.getElementById('filter-discount').value = 100;
+  document.getElementById('discount-val').textContent = '100';
+  document.getElementById('filter-rating').value = 0;
+  document.getElementById('rating-val').textContent = '0';
+  document.getElementById('table-search').value = '';
+  tableSearch = '';
+
+  // Reset date to full range
+  const dates = rawData.map(r => r.order_date).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('filter-date-from').value = dates[0];
+    document.getElementById('filter-date-to').value = dates[dates.length-1];
+  }
+
+  applyFilters();
+}
+</script>
+</body>
+</html>
